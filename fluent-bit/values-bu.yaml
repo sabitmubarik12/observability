@@ -1,0 +1,379 @@
+# Default values for fluent-bit.
+# This file is used to deploy Fluent Bit as a DaemonSet and configure it to scrape all
+# container logs in Kubernetes using multiple parsers (docker and cri).
+
+# kind -- DaemonSet or Deployment (DaemonSet is most common for log collectors)
+kind: DaemonSet
+
+# replicaCount -- Only applicable if kind=Deployment
+replicaCount: 1
+
+image:
+  repository: cr.fluentbit.io/fluent/fluent-bit
+  # Overrides the image tag whose default is {{ .Chart.AppVersion }}
+  # Set to "-" to not use the default value
+  tag: "2.0.11"         # adjust as needed
+  digest:
+  pullPolicy: IfNotPresent
+
+testFramework:
+  enabled: true
+  namespace:
+  image:
+    repository: busybox
+    pullPolicy: Always
+    tag: latest
+    digest:
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name:
+
+rbac:
+  create: true
+  nodeAccess: false
+  eventsAccess: false
+
+# Configure podsecuritypolicy (if applicable)
+podSecurityPolicy:
+  create: false
+  annotations: {}
+
+# OpenShift-specific configuration
+openShift:
+  enabled: false
+  securityContextConstraints:
+    create: true
+    name: ""
+    annotations: {}
+    existingName: ""
+
+podSecurityContext: {}
+#   fsGroup: 2000
+
+hostNetwork: false
+dnsPolicy: ClusterFirst
+
+dnsConfig: {}
+#   nameservers:
+#     - 1.2.3.4
+#   searches:
+#     - ns1.svc.cluster-domain.example
+#     - my.dns.search.suffix
+#   options:
+#     - name: ndots
+#       value: "2"
+#     - name: edns0
+
+hostAliases: []
+#   - ip: "1.2.3.4"
+#     hostnames:
+#     - "foo.local"
+#     - "bar.local"
+
+securityContext: {}
+#   capabilities:
+#     drop:
+#     - ALL
+#   readOnlyRootFilesystem: true
+#   runAsNonRoot: true
+#   runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 2020
+  internalTrafficPolicy:
+  loadBalancerClass:
+  loadBalancerSourceRanges: []
+  labels: {}
+  # nodePort: 30020
+  # clusterIP: 172.16.10.1
+  annotations: {}
+#   prometheus.io/path: "/api/v1/metrics/prometheus"
+#   prometheus.io/port: "2020"
+#   prometheus.io/scrape: "true"
+  externalIPs: []
+  # externalIPs:
+  #  - 2.2.2.2
+
+serviceMonitor:
+  enabled: false
+  additionalEndpoints: []
+  # You can uncomment and configure these if you wish to collect metrics.
+  # namespace: monitoring
+  # interval: 10s
+  # scrapeTimeout: 10s
+  # selector:
+  #   prometheus: my-prometheus
+
+prometheusRule:
+  enabled: false
+#   namespace: ""
+#   additionalLabels: {}
+#   rules:
+#   - alert: NoOutputBytesProcessed
+#     expr: rate(fluentbit_output_proc_bytes_total[5m]) == 0
+#     annotations:
+#       message: |
+#         Fluent Bit instance {{ $labels.instance }}'s output plugin {{ $labels.name }} has not processed any
+#         bytes for at least 15 minutes.
+#       summary: No Output Bytes Processed
+#     for: 15m
+#     labels:
+#       severity: critical
+
+dashboards:
+  enabled: false
+  labelKey: grafana_dashboard
+  labelValue: 1
+  annotations: {}
+  namespace: ""
+
+lifecycle: {}
+#   preStop:
+#     exec:
+#       command: ["/bin/sh", "-c", "sleep 20"]
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+
+readinessProbe:
+  httpGet:
+    path: /api/v1/health
+    port: http
+
+resources: {}
+#   limits:
+#     cpu: 100m
+#     memory: 128Mi
+#   requests:
+#     cpu: 100m
+#     memory: 128Mi
+
+## only available if kind is Deployment
+ingress:
+  enabled: false
+  ingressClassName: ""
+  annotations: {}
+  hosts: []
+  extraHosts: []
+  tls: []
+
+## only available if kind is Deployment
+autoscaling:
+  vpa:
+    enabled: false
+    annotations: {}
+    controlledResources: []
+    maxAllowed: {}
+    minAllowed: {}
+    updatePolicy:
+      updateMode: Auto
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 75
+  customRules: []
+  behavior: {}
+
+## only available if kind is Deployment
+podDisruptionBudget:
+  enabled: false
+  annotations: {}
+  maxUnavailable: "30%"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+labels: {}
+
+annotations: {}
+
+podAnnotations: {}
+
+podLabels: {}
+
+minReadySeconds:
+
+terminationGracePeriodSeconds:
+
+priorityClassName: ""
+
+env: []
+#  - name: FOO
+#    value: "bar"
+
+envWithTpl: []
+#  - name: FOO_2
+#    value: "{{ .Values.foo2 }}"
+# foo2: bar2
+
+envFrom: []
+
+extraContainers: []
+
+flush: 1
+
+metricsPort: 2020
+
+extraPorts: []
+
+extraVolumes: []
+
+extraVolumeMounts: []
+
+updateStrategy: {}
+#   type: RollingUpdate
+#   rollingUpdate:
+#     maxUnavailable: 1
+
+existingConfigMap: ""
+
+networkPolicy:
+  enabled: false
+#   ingress:
+#     from: []
+
+luaScripts: {}
+
+## Fluent Bit main configuration file (classic mode).
+## This configuration is templated and written into a ConfigMap for the pod.
+config:
+  service: |
+    [SERVICE]
+        Daemon Off
+        Flush {{ .Values.flush }}
+        Log_Level debug
+        Parsers_File /fluent-bit/etc/parsers.conf
+        Parsers_File /fluent-bit/etc/conf/custom_parsers.conf
+        HTTP_Server On
+        HTTP_Listen 0.0.0.0
+        HTTP_Port {{ .Values.metricsPort }}
+        Health_Check On
+
+  inputs: |
+    [INPUT]
+        Name tail
+        Path /var/log/**/*.log
+        Parser json
+        multiline.parser docker, cri
+        Tag kube.*
+        Mem_Buf_Limit 5MB
+        Skip_Long_Lines On
+        DB /var/log/flb_kube.db
+        Ignore_Older 1h
+
+  filters: |
+    [FILTER]
+        Name kubernetes
+        Match kube.*
+        Kube_Tag_Prefix "kube."
+        Merge_Log On
+        Keep_Log Off
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude On
+
+  outputs: |
+    [OUTPUT]
+        Name          es
+        Match         *
+        Host          16.162.179.143
+        Port          9200
+        Logstash_Format On
+        Logstash_Prefix kchat-dev
+        Retry_Limit   False
+        Suppress_Type_Name On
+
+  customParsers: |
+    [PARSER]
+        Name docker
+        Format json
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep On
+        Decode_Field_As escaped_utf8 log
+
+    # [PARSER]
+    #     Name cri
+    #     Format regex
+    #     Regex ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<message>.*)$
+    #     Time_Key time
+    #     Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name        cri
+        Format      regex
+        # This regex extracts:
+        #  - time: the full timestamp from the log (with fractional seconds)
+        #  - stream: either stdout or stderr
+        #  - flag: a single character flag (often "F")
+        #  - log: the remaining message
+        Regex       /^(?<time>[^ ]+)\s+(?<stream>stdout|stderr)\s+(?<flag>[A-Z])\s+(?<log>.*)$/
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Time_Keep   On
+
+  extraFiles: {}
+#     You can add extra configuration files here if needed.
+#     example.conf: |
+#       [OUTPUT]
+#           Name example
+#           Match foo.*
+#           Host bar
+
+## Volume mounts: Mount the generated config into the Fluent Bit container.
+volumeMounts:
+  - name: config
+    mountPath: /fluent-bit/etc/conf
+
+daemonSetVolumes:
+  - name: varlog
+    hostPath:
+      path: /var/log
+  - name: varlibdockercontainers
+    hostPath:
+      path: /var/lib/docker/containers
+  - name: etcmachineid
+    hostPath:
+      path: /etc/machine-id
+      type: File
+
+daemonSetVolumeMounts:
+  - name: varlog
+    mountPath: /var/log
+  - name: varlibdockercontainers
+    mountPath: /var/lib/docker/containers
+    readOnly: true
+  - name: etcmachineid
+    mountPath: /etc/machine-id
+    readOnly: true
+
+command:
+  - /fluent-bit/bin/fluent-bit
+
+args:
+  - --workdir=/fluent-bit/etc
+  - --config=/fluent-bit/etc/conf/fluent-bit.conf
+
+initContainers: []
+
+logLevel: info
+
+hotReload:
+  enabled: false
+  image:
+    repository: ghcr.io/jimmidyson/configmap-reload
+    tag: v0.11.1
+    digest:
+    pullPolicy: IfNotPresent
+  resources: {}

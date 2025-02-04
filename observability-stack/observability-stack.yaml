@@ -1,0 +1,320 @@
+services:
+  nginx:
+    image: 'nginx:latest'
+    container_name: nginx
+    volumes:
+      - './nginx/conf.d:/etc/nginx/conf.d'
+      - './nginx/certs:/etc/nginx/certs'
+      - /home/ec2-user/.htpasswd:/etc/nginx/.htpasswd
+    ports:
+      - '443:443'
+    networks:
+      - observability
+    restart: always
+#PGA STACK RESOURCE CODE
+# Prometheus
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    volumes:
+      - prometheus-data:/prometheus
+      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
+      - ./prometheus/rules.yaml:/etc/prometheus/rules.yaml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+    ports:
+      - "9090:9090"
+    networks:
+      - "observability"
+    restart: always
+  # Grafana
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    environment:
+      - GF_SERVER_ROOT_URL=https://observe.sabitmubarik.com/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    user: "root"
+    volumes:
+      - "grafana-data:/var/lib/grafana"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - "observability"
+    restart: always
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data:/data
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--web.route-prefix=/'
+      - '--web.external-url=https://observe.sabitmubarik.com/alertmanager'
+    networks:
+      - observability
+    environment:
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=sabit@uney.com
+      - SMTP_PASSWORD="kspl gmsv puit vkhh"
+      - SMTP_TLS=true
+#    environment:
+#      - "WEB_ROUTE_PREFIX=/#/alerts"  # This should match your Nginx configuration
+#      - "WEB_EXTERNAL_URL=https://observe.sabitmubarik.com/#/alerts"  # Adjust as needed
+    restart: always
+#ELK STACK RESOURCE CODE
+  # elasticsearch:
+  #   image: 'docker.elastic.co/elasticsearch/elasticsearch:8.14.0'
+  #   container_name: elasticsearch
+  #   environment:
+  #     - xpack.security.transport.ssl.enabled=false
+  #     - xpack.ml.enabled=false
+  #     - node.name=es-node
+  #     - xpack.security.enabled=false
+  #     - discovery.type=single-node
+  #     - cluster.name=docker-cluster
+  #     - bootstrap.memory_lock=true
+  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+  #     - xpack.security.enabled=false
+  #     - xpack.monitoring.collection.enabled=true
+  #     - xpack.monitoring.templates.enabled=true
+  #   ulimits:
+  #     memlock:
+  #       soft: -1
+  #       hard: -1
+  #   volumes:
+  #     - 'elasticsearch1:/usr/share/elasticsearch/data'
+  #   ports:
+  #     - '9200:9200'
+  #     - '9300:9300'
+  #   networks:
+  #     - observability
+  #   restart: always
+  elasticsearch:
+    image: 'docker.elastic.co/elasticsearch/elasticsearch:8.14.0'
+    container_name: elasticsearch
+    environment:
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.ml.enabled=false
+      - node.name=es-node
+      - xpack.security.enabled=false
+#      - discovery.type=single-node
+      - cluster.name=docker-cluster
+      - discovery.seed_hosts=elasticsearch3,elasticsearch2,elasticsearch
+      - cluster.initial_master_nodes=elasticsearch,elasticsearch2,elasticsearch3
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
+      - xpack.security.enabled=false
+      - xpack.monitoring.collection.enabled=true
+      - xpack.monitoring.templates.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - 'elasticsearch1:/usr/share/elasticsearch/data'
+    ports:
+      - '9200:9200'
+      - '9300:9300'
+    networks:
+      - observability
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "1"
+
+  elasticsearch2:
+    image: 'docker.elastic.co/elasticsearch/elasticsearch:8.14.0'
+    container_name: elasticsearch2
+    environment:
+      - node.name=es-node-2
+      - cluster.name=docker-cluster
+      - discovery.seed_hosts=elasticsearch3,elasticsearch2,elasticsearch
+      - cluster.initial_master_nodes=elasticsearch,elasticsearch2,elasticsearch3
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
+      - xpack.security.enabled=false
+      - xpack.ml.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.monitoring.collection.enabled=true
+      - xpack.monitoring.templates.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - 'elasticsearch2:/usr/share/elasticsearch/data'
+    networks:
+      - observability
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "1"
+
+  elasticsearch3:
+    image: 'docker.elastic.co/elasticsearch/elasticsearch:8.14.0'
+    container_name: elasticsearch3
+    environment:
+      - node.name=es-node-3
+      - cluster.name=docker-cluster
+      - discovery.seed_hosts=elasticsearch3,elasticsearch2,elasticsearch
+      - cluster.initial_master_nodes=elasticsearch,elasticsearch2,elasticsearch3
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms8g -Xmx8g"
+      - xpack.security.enabled=false
+      - xpack.ml.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.monitoring.collection.enabled=true
+      - xpack.monitoring.templates.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - 'elasticsearch3:/usr/share/elasticsearch/data'
+    networks:
+      - observability
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "1"
+
+  logstash:
+    image: 'docker.elastic.co/logstash/logstash:8.14.0'
+    container_name: logstash
+    environment:
+      - LS_JAVA_OPTS=-Xms1g -Xmx1g -Djava.awt.headless=true -Dfile.encoding=UTF-8 -Djruby.compile.invokedynamic=true -XX:+HeapDumpOnOutOfMemoryError -Djava.security.egd=file:/dev/urandom -Dlog4j2.isThreadContextMapInheritable=true -Dlogstash.jackson.stream-read-constraints.max-string-length=200000000 -Dlogstash.jackson.stream-read-constraints.max-number-length=10000 -Dls.cgroup.cpuacct.path.override=/ -Dls.cgroup.cpu.path.override=/ -Djruby.regexp.interruptible=true -Djdk.io.File.enableADS=true --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.base/java.security=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio.channels=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.management/sun.management=ALL-UNNAMED -Dio.netty.allocator.maxOrder=11
+    volumes:
+      - 'logstash-pipeline:/usr/share/logstash/pipeline'
+    ports:
+      - '5044:5044'
+    networks:
+      - observability
+    restart: always
+    
+  kibana:
+    image: 'docker.elastic.co/kibana/kibana:8.14.0'
+    container_name: kibana
+    environment:
+      - SERVER_BASEPATH=/kibana
+      - SERVER_REWRITEBASEPATH=true
+      - elasticsearch.ssl.verificationMode="None"
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - "XPACK_APM_SERVICEMAPENABLED=true"
+      - elasticsearch.ssl.verificationMode=false
+      - CSP_RULES_SCRIPT_SRC='self unsafe-inline'
+    ports:
+      - '5601:5601'
+    # depends_on:
+    #   - elasticsearch
+    networks:
+      - observability
+    restart: always
+#SENTRY
+  sentry-redis:
+    image: redis:latest
+    container_name: sentry-redis
+    hostname: sentry-redis
+    restart: always
+    networks:
+      - observability
+    volumes:
+      - 'sentry-redis:/data'
+  sentry-postgres:
+    image: postgres:latest
+    container_name: sentry-postgres
+    hostname: sentry-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: sentry
+      POSTGRES_PASSWORD: 89PsZXyRStOT2
+      POSTGRES_DB: sentry
+    networks:
+      - observability
+    volumes:
+      - 'sentry-postgres:/var/lib/postgresql/data'
+  sentry-base:
+    image: sentry:latest
+    container_name: sentry-base
+    hostname: sentry-base
+    restart: always
+    ports:
+      - '9000:9000'
+    env_file:
+      - .env
+    depends_on:
+      - sentry-redis
+      - sentry-postgres
+    networks:
+      - observability
+    volumes:
+      - 'sentry-base:/var/lib/sentry/files'
+  sentry-cron:
+    image: sentry:latest
+    container_name: sentry-cron
+    hostname: sentry-cron
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - sentry-redis
+      - sentry-postgres
+    command: "sentry run cron"
+    networks:
+      - observability
+    volumes:
+      - 'sentry-base:/var/lib/sentry/files'
+  sentry-worker:
+    image: sentry:latest
+    container_name: sentry-worker
+    hostname: sentry-worker
+    restart: always
+    env_file:
+      - .env
+    depends_on:
+      - sentry-redis
+      - sentry-postgres
+    command: "sentry run worker"
+    networks:
+      - observability
+    volumes:
+      - 'sentry-base:/var/lib/sentry/files'
+volumes:
+  elasticsearch1:
+    driver: local
+  elasticsearch2:
+    driver: local
+  elasticsearch3:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local
+  esdata:
+    driver: local
+  logstash-pipeline:
+    driver: local
+  alertmanager-data:
+    driver: local
+  sentry-redis:
+    driver: local
+  sentry-postgres:
+    driver: local
+  sentry-base:
+    driver: local  
+networks:
+  observability:
+    driver: bridge

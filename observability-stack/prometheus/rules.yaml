@@ -1,0 +1,158 @@
+groups:
+  - name: node_exporter_rules
+    rules:
+      - alert: HighCPUUsage
+        expr: avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) < 0.2
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU usage on instance {{ $labels.instance }}"
+          description: "CPU usage is above 80% for more than 5 minutes."
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High memory usage on instance {{ $labels.instance }}"
+          description: "Memory usage is above 90% for more than 5 minutes."
+
+      - alert: LowDiskSpace
+        expr: node_filesystem_free_bytes / node_filesystem_size_bytes < 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space on instance {{ $labels.instance }}"
+          description: "Less than 10% disk space remaining."
+
+      - alert: NodeDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Node {{ $labels.instance }} is down
+          description: Node {{ $labels.instance }} has been down for 5 minutes
+
+      - alert: HighNetworkTraffic
+        expr: node_network_receive_bytes > 100e6
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: High network traffic on host {{ $labels.instance }}
+          description: The inbound network traffic on host {{ $labels.instance }} has exceeded 100 MB/s for 5 minutes.
+
+
+  - name: application_alerts
+    rules:
+      - alert: CPUUsagePercentage
+        expr: cpu_usage_percentage > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: MemoryUsageBytes
+        expr: memory_usage_bytes > 6000000000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: NetworkBytesSent
+        expr: network_bytes_sent > 94659726510
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: NetworkBytesEeceived
+        expr: network_bytes_received > 94659726510
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: ProcessCPUUsagePercentage
+        expr: process_cpu_usage_percentage > 6000000000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: ProcessMemoryUsageBytes
+        expr: process_memory_usage_bytes > 6000000000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: ProcessNumThreads
+        expr: process_num_threads > 6000000000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: CountHttpRequestsTotal)
+        expr: count(http_requests_total) > 6000000000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: HttpRequestDurationSecondsBucket
+        expr: http_request_duration_seconds_bucket > 6000000000
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage Percentage detected on Uneyguard servers"
+          description: "Percentage is above 60% for more than 1 minutes."
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High response time detected"
+          description: "Response time is above 500ms for more than 5 minutes."
+
+      - alert: HighErrorRate
+        expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for more than 5 minutes."
+
+      - alert: SuddenIncreaseInRequestRate
+        expr: rate(http_requests_total[1m]) > 1000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sudden increase in request rate detected"
+          description: "Request rate has suddenly increased beyond the threshold."
